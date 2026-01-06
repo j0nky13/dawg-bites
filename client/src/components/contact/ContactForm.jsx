@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, CalendarDays, Building2, User, Phone, Mail, MessageSquare } from "lucide-react";
+import {
+  Send,
+  CalendarDays,
+  Building2,
+  User,
+  Phone,
+  Mail,
+  MessageSquare,
+} from "lucide-react";
 
 const FIELD_WRAP =
   "relative border border-black/10 bg-[#F6F0E3] rounded-2xl px-5 py-4 transition-colors focus-within:border-[#982810]/60 focus-within:ring-2 focus-within:ring-[#982810]/20";
@@ -28,7 +36,7 @@ function Field({ label, icon: Icon, children }) {
 }
 
 export default function ContactForm() {
-  const [status, setStatus] = useState("idle"); // idle | sending | sent
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [form, setForm] = useState({
     name: "",
     company: "",
@@ -44,11 +52,13 @@ export default function ContactForm() {
       form.company.trim() &&
       (form.email.trim() || form.phone.trim()) &&
       form.message.trim();
+
     return Boolean(hasBasics) && status !== "sending";
   }, [form, status]);
 
   function update(key) {
-    return (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+    return (e) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
   }
 
   async function onSubmit(e) {
@@ -58,15 +68,22 @@ export default function ContactForm() {
     try {
       setStatus("sending");
 
-      // TODO: wire to backend later
-      // await fetch("/api/leads", { method:"POST", headers:{...}, body: JSON.stringify(form) })
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
 
-      await new Promise((r) => setTimeout(r, 600)); // tiny UX pause
+      if (!res.ok) {
+        throw new Error("Request failed");
+      }
+
       setStatus("sent");
     } catch (err) {
       console.error(err);
-      setStatus("idle");
-      alert("Something went wrong. Please try again.");
+      setStatus("error");
     }
   }
 
@@ -74,7 +91,7 @@ export default function ContactForm() {
     <section className="bg-[#F6F0E3]">
       <div className="max-w-7xl mx-auto px-6 py-32">
         <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-16 items-start">
-          {/* Left: Pitch + Form */}
+          {/* Left: Form */}
           <div>
             <motion.div
               initial={{ opacity: 0, y: 22 }}
@@ -88,8 +105,8 @@ export default function ContactForm() {
                 <span className="block text-[#982810]">& Estimate</span>
               </h2>
               <p className="text-xl opacity-80 leading-relaxed">
-                Tell us what you’re planning. We’ll reply with a simple flat-rate option,
-                recommended timing, and next steps.
+                Tell us what you’re planning. We’ll reply with a simple flat-rate
+                option, recommended timing, and next steps.
               </p>
             </motion.div>
 
@@ -188,6 +205,12 @@ export default function ContactForm() {
                       Got it — we’ll reach out shortly.
                     </div>
                   )}
+
+                  {status === "error" && (
+                    <div className="mt-4 text-sm text-red-700">
+                      Something went wrong. Please try again or call us.
+                    </div>
+                  )}
                 </div>
               </div>
             </form>
@@ -210,18 +233,17 @@ export default function ContactForm() {
                 We’ll confirm your time window, headcount, and any on-site needs.
               </p>
               <p>
-                You’ll get a simple flat-rate quote and a clean plan for execution.
+                You’ll receive a clean flat-rate quote and execution plan.
               </p>
               <p>
-                Once approved, we can set you up with portal access for scheduling
-                requests and updates.
+                Once approved, we handle everything on-site.
               </p>
             </div>
 
             <div className="mt-10 pt-8 border-t border-black/10">
               <div className="text-sm opacity-70 mb-2">Prefer to call?</div>
               <div className="text-2xl font-extrabold text-[#982810]">
-                919-986-1174
+                843-804-0041
               </div>
               <div className="text-sm opacity-70 mt-2">
                 Charleston, SC

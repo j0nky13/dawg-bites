@@ -1,52 +1,71 @@
+import express from "express";
+import cors from "cors";
+import nodemailer from "nodemailer";
 
+const app = express();
 
-import express from 'express'
-import cors from 'cors'
-import 'dotenv/config'
-import contactRouter from './routes/contact.js'
+app.use(cors());
+app.use(express.json());
 
-// --- App setup
-const app = express()
+/* ===========================
+   SMTP CONFIG (GMAIL)
+=========================== */
 
-// If your frontend runs on a different origin in dev, adjust this list
-const allowedOrigins = [
-  'http://localhost:5173', // Vite dev server
-  process.env.FRONTEND_ORIGIN || ''
-].filter(Boolean)
-
-app.use(cors({
-  origin: (origin, cb) => {
-    // Allow same-origin or no-origin (curl, Postman)
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
-    return cb(null, true) // loosen CORS for now; tighten later if needed
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER, // dawgbites2025@gmail.com
+    pass: process.env.EMAIL_PASS, // app password
   },
-  methods: ['POST', 'GET', 'OPTIONS'],
-}))
+});
 
-app.use(express.json())
+/* ===========================
+   CONTACT FORM ROUTE
+=========================== */
 
-// --- Health check
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, env: process.env.NODE_ENV || 'development' })
-})
+app.post("/api/contact", async (req, res) => {
+  const {
+    name,
+    company,
+    email,
+    phone,
+    date,
+    message,
+  } = req.body;
 
-// --- Routes
-app.use('/api/contact', contactRouter)
+  if (!name || !company || (!email && !phone) || !message) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
-// --- 404 handler (API only)
-app.use('/api', (_req, res) => {
-  res.status(404).json({ ok: false, error: 'Not Found' })
-})
+  try {
+    await transporter.sendMail({
+      from: `"Dawg Bites Website" <${process.env.EMAIL_USER}>`,
+      to: "dawgbites2025@gmail.com",
+      replyTo: email || undefined,
+      subject: `New Dawg Bites Event Request — ${company}`,
+      html: `
+        <h2>New Event Request</h2>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Company:</strong> ${company}</p>
+        <p><strong>Email:</strong> ${email || "N/A"}</p>
+        <p><strong>Phone:</strong> ${phone || "N/A"}</p>
+        <p><strong>Preferred Date:</strong> ${date || "Not specified"}</p>
+        <hr />
+        <p><strong>Message:</strong></p>
+        <p>${message.replace(/\n/g, "<br />")}</p>
+      `,
+    });
 
-// --- Error handler
-// eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
-  console.error('[API ERROR]', err)
-  res.status(500).json({ ok: false, error: 'Internal Server Error' })
-})
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Email error:", err);
+    res.status(500).json({ error: "Failed to send email" });
+  }
+});
 
-// --- Start server
-const PORT = Number(process.env.PORT) || 3001
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`[API] listening on http://localhost:${PORT}`)
-})
+  console.log(`Server running on port ${PORT}`);
+});
