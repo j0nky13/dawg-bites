@@ -1,0 +1,5 @@
+packages:
+  - name: contact
+    actions:
+      - name: contact
+        runtime: nodejs:18

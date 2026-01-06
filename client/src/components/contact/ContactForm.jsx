@@ -10,6 +10,17 @@ import {
   MessageSquare,
 } from "lucide-react";
 
+/* ===========================
+   SERVERLESS CONFIG
+=========================== */
+
+const CONTACT_ENDPOINT =
+  "https://fn-5101da0b-34bf-449d-9e75-13b20bda2169.functions.digitalocean.com/contact/contact";
+
+/* ===========================
+   STYLES
+=========================== */
+
 const FIELD_WRAP =
   "relative border border-black/10 bg-[#F6F0E3] rounded-2xl px-5 py-4 transition-colors focus-within:border-[#982810]/60 focus-within:ring-2 focus-within:ring-[#982810]/20";
 const LABEL =
@@ -18,6 +29,10 @@ const INPUT =
   "w-full bg-transparent outline-none text-base md:text-lg placeholder:text-black/35";
 const TEXTAREA =
   "w-full bg-transparent outline-none text-base md:text-lg placeholder:text-black/35 min-h-[140px] resize-none";
+
+/* ===========================
+   FIELD COMPONENT
+=========================== */
 
 function Field({ label, icon: Icon, children }) {
   return (
@@ -34,6 +49,10 @@ function Field({ label, icon: Icon, children }) {
     </div>
   );
 }
+
+/* ===========================
+   CONTACT FORM
+=========================== */
 
 export default function ContactForm() {
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
@@ -68,7 +87,7 @@ export default function ContactForm() {
     try {
       setStatus("sending");
 
-      const res = await fetch("/api/contact", {
+      const res = await fetch(CONTACT_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -105,8 +124,8 @@ export default function ContactForm() {
                 <span className="block text-[#982810]">& Estimate</span>
               </h2>
               <p className="text-xl opacity-80 leading-relaxed">
-                Tell us what you’re planning. We’ll reply with a simple flat-rate
-                option, recommended timing, and next steps.
+                Tell us what you’re planning. We’ll reply with timing, pricing,
+                and next steps.
               </p>
             </motion.div>
 
@@ -230,7 +249,7 @@ export default function ContactForm() {
 
             <div className="space-y-6 text-lg opacity-85 leading-relaxed">
               <p>
-                We’ll confirm your time window, headcount, and any on-site needs.
+                We’ll confirm your time window, headcount, and on-site needs.
               </p>
               <p>
                 You’ll receive a clean flat-rate quote and execution plan.

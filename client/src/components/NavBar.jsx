@@ -17,7 +17,7 @@ export default function NavBar() {
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3">
           <img
-  src="/client/public/dawgbites-logo.PNG"
+  src="/dawgbites-logo.png"
   alt="Dawg Bites"
   className="h-12 w-auto"
 />
