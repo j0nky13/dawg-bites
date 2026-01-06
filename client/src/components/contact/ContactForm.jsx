@@ -163,7 +163,7 @@ export default function ContactForm() {
                   />
                 </Field>
 
-                {/* PHONE FIX — validation only, no UI change */}
+                {/* PHONE FIX — ONE LINE ONLY */}
                 <Field label="Phone" icon={Phone}>
                   <input
                     className={INPUT}
@@ -173,7 +173,7 @@ export default function ContactForm() {
                     onChange={update("phone")}
                     placeholder="(843) 555-0123"
                     autoComplete="tel"
-                    pattern="^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$"
+                    pattern="^\\(?[0-9]{3}\\)?[-. ]?[0-9]{3}[-. ]?[0-9]{4}$"
                     title="Please enter a valid phone number"
                   />
                 </Field>

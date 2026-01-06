@@ -1,11 +1,40 @@
 import nodemailer from "nodemailer";
 
 export async function main(args) {
-  const { name, company, email, phone, date, message } = args;
+  const headers = {
+    "Access-Control-Allow-Origin": "https://dawgbiteschs.com",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  // Handle CORS preflight
+  if (args.__ow_method === "options") {
+    return {
+      statusCode: 204,
+      headers,
+    };
+  }
+
+  let data;
+  try {
+    data =
+      typeof args.body === "string"
+        ? JSON.parse(args.body)
+        : args.body || args;
+  } catch {
+    return {
+      statusCode: 400,
+      headers,
+      body: { error: "Invalid JSON body" },
+    };
+  }
+
+  const { name, company, email, phone, date, message } = data;
 
   if (!name || !company || (!email && !phone) || !message) {
     return {
       statusCode: 400,
+      headers,
       body: { error: "Missing required fields" },
     };
   }
@@ -40,12 +69,14 @@ export async function main(args) {
 
     return {
       statusCode: 200,
+      headers,
       body: { success: true },
     };
   } catch (err) {
     console.error("Email error:", err);
     return {
       statusCode: 500,
+      headers,
       body: { error: "Failed to send email" },
     };
   }
