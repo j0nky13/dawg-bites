@@ -1,7 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
-import logo from "../assets/dawgbites-logo.png";
 
 const linkBase = "transition-colors hover:text-[#982810]";
 const active = "text-[#982810] font-semibold";
@@ -17,7 +16,11 @@ export default function NavBar() {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3">
-          <img src={logo} alt="Dawg Bites" className="h-12 w-auto" />
+          <img
+  src="/dawgbites-logo.png"
+  alt="Dawg Bites"
+  className="h-12 w-auto"
+/>
           <span className="font-bold text-lg tracking-wide">
             Dawg Bites
           </span>
