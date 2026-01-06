@@ -15,7 +15,7 @@ import {
 =========================== */
 
 const CONTACT_ENDPOINT =
-  "https://fn-5101da0b-34bf-449d-9e75-13b20bda2169.functions.digitalocean.com/contact/contact";
+  "https://faas-nyc1-2ef2e6cc.doserverless.co/contact/contact";
 
 /* ===========================
    STYLES
@@ -163,13 +163,18 @@ export default function ContactForm() {
                   />
                 </Field>
 
+                {/* PHONE FIX — validation only, no UI change */}
                 <Field label="Phone" icon={Phone}>
                   <input
                     className={INPUT}
+                    type="tel"
+                    inputMode="tel"
                     value={form.phone}
                     onChange={update("phone")}
                     placeholder="(843) 555-0123"
                     autoComplete="tel"
+                    pattern="^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$"
+                    title="Please enter a valid phone number"
                   />
                 </Field>
               </div>
@@ -248,15 +253,9 @@ export default function ContactForm() {
             </div>
 
             <div className="space-y-6 text-lg opacity-85 leading-relaxed">
-              <p>
-                We’ll confirm your time window, headcount, and on-site needs.
-              </p>
-              <p>
-                You’ll receive a clean flat-rate quote and execution plan.
-              </p>
-              <p>
-                Once approved, we handle everything on-site.
-              </p>
+              <p>We’ll confirm your time window, headcount, and on-site needs.</p>
+              <p>You’ll receive a clean flat-rate quote and execution plan.</p>
+              <p>Once approved, we handle everything on-site.</p>
             </div>
 
             <div className="mt-10 pt-8 border-t border-black/10">
