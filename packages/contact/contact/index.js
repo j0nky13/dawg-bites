@@ -1,41 +1,38 @@
 import nodemailer from "nodemailer";
 
 export async function main(args) {
-  const headers = {
-    "Access-Control-Allow-Origin": "https://dawgbiteschs.com",
+  // ✅ CORS HEADERS — ALWAYS
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
   };
 
-  // Handle CORS preflight
+  // ✅ Handle preflight FIRST
   if (args.__ow_method === "options") {
     return {
       statusCode: 204,
-      headers,
+      headers: corsHeaders,
+      body: "",
     };
   }
 
-  let data;
-  try {
-    data =
-      typeof args.body === "string"
-        ? JSON.parse(args.body)
-        : args.body || args;
-  } catch {
-    return {
-      statusCode: 400,
-      headers,
-      body: { error: "Invalid JSON body" },
-    };
-  }
-
-  const { name, company, email, phone, date, message } = data;
+  // ✅ BODY COMES FROM args.body (DigitalOcean quirk)
+  const {
+    name,
+    company,
+    email,
+    phone,
+    date,
+    message,
+  } = args.body || {};
 
   if (!name || !company || (!email && !phone) || !message) {
     return {
       statusCode: 400,
-      headers,
-      body: { error: "Missing required fields" },
+      headers: corsHeaders,
+      body: JSON.stringify({ error: "Missing required fields" }),
     };
   }
 
@@ -63,21 +60,21 @@ export async function main(args) {
         <p><strong>Phone:</strong> ${phone || "N/A"}</p>
         <p><strong>Date:</strong> ${date || "Not specified"}</p>
         <hr />
-        <p>${message.replace(/\n/g, "<br />")}</p>
+        <p>${String(message).replace(/\n/g, "<br />")}</p>
       `,
     });
 
     return {
       statusCode: 200,
-      headers,
-      body: { success: true },
+      headers: corsHeaders,
+      body: JSON.stringify({ success: true }),
     };
   } catch (err) {
     console.error("Email error:", err);
     return {
       statusCode: 500,
-      headers,
-      body: { error: "Failed to send email" },
+      headers: corsHeaders,
+      body: JSON.stringify({ error: "Failed to send email" }),
     };
   }
 }

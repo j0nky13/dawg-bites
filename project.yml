@@ -1,5 +1,6 @@
 packages:
   - name: contact
+    web: true
     actions:
       - name: contact
         runtime: nodejs:18

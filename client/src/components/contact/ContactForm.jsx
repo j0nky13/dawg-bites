@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Send,
@@ -14,8 +14,8 @@ import {
    SERVERLESS CONFIG
 =========================== */
 
-const CONTACT_ENDPOINT =
-  "https://faas-nyc1-2ef2e6cc.doserverless.co/contact/contact";
+const CONTACT_ENDPOINT = "https://formspree.io/f/xaqnrnqd";
+
 
 /* ===========================
    STYLES
@@ -29,6 +29,20 @@ const INPUT =
   "w-full bg-transparent outline-none text-base md:text-lg placeholder:text-black/35";
 const TEXTAREA =
   "w-full bg-transparent outline-none text-base md:text-lg placeholder:text-black/35 min-h-[140px] resize-none";
+
+/* ===========================
+   PHONE FORMATTER (ONLY NEW LOGIC)
+=========================== */
+
+function formatPhone(value) {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+
+  if (digits.length < 4) return digits;
+  if (digits.length < 7)
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 /* ===========================
    FIELD COMPONENT
@@ -55,7 +69,7 @@ function Field({ label, icon: Icon, children }) {
 =========================== */
 
 export default function ContactForm() {
-  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+  const [status, setStatus] = useState("idle");
   const [form, setForm] = useState({
     name: "",
     company: "",
@@ -64,6 +78,8 @@ export default function ContactForm() {
     date: "",
     message: "",
   });
+
+  const phoneRef = useRef(null);
 
   const canSubmit = useMemo(() => {
     const hasBasics =
@@ -88,16 +104,22 @@ export default function ContactForm() {
       setStatus("sending");
 
       const res = await fetch(CONTACT_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+  },
+  body: JSON.stringify({
+    name: form.name,
+    company: form.company,
+    email: form.email,
+    phone: form.phone,
+    date: form.date,
+    message: form.message,
+  }),
+});
 
-      if (!res.ok) {
-        throw new Error("Request failed");
-      }
+      if (!res.ok) throw new Error("Request failed");
 
       setStatus("sent");
     } catch (err) {
@@ -163,18 +185,22 @@ export default function ContactForm() {
                   />
                 </Field>
 
-                {/* PHONE FIX — ONE LINE ONLY */}
+                {/* ✅ LIVE PHONE FORMATTING */}
                 <Field label="Phone" icon={Phone}>
                   <input
+                    ref={phoneRef}
                     className={INPUT}
                     type="tel"
                     inputMode="tel"
                     value={form.phone}
-                    onChange={update("phone")}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        phone: formatPhone(e.target.value),
+                      }))
+                    }
                     placeholder="(843) 555-0123"
                     autoComplete="tel"
-                    pattern="^\\(?[0-9]{3}\\)?[-. ]?[0-9]{3}[-. ]?[0-9]{4}$"
-                    title="Please enter a valid phone number"
                   />
                 </Field>
               </div>
@@ -263,9 +289,7 @@ export default function ContactForm() {
               <div className="text-2xl font-extrabold text-[#982810]">
                 843-804-0041
               </div>
-              <div className="text-sm opacity-70 mt-2">
-                Charleston, SC
-              </div>
+              <div className="text-sm opacity-70 mt-2">Charleston, SC</div>
             </div>
           </motion.aside>
         </div>
