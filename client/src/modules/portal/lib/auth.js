@@ -7,8 +7,6 @@ import {
 } from "firebase/auth";
 
 import { auth } from "../../../lib/firebase";
-import { findPendingInviteByEmail } from "./invitesApi"; // ✅ RESTORED
-import { ensureUserProfile } from "./profile";
 
 const STORAGE_KEY = "mm_emailForSignIn";
 
@@ -21,8 +19,10 @@ function actionCodeSettings() {
 
 export async function sendLoginLink(email) {
   if (!email) throw new Error("Email is required");
+
   await sendSignInLinkToEmail(auth, email, actionCodeSettings());
   window.localStorage.setItem(STORAGE_KEY, email);
+
   return true;
 }
 
@@ -33,7 +33,7 @@ export async function login(email) {
 
 /**
  * OTP Step 2: complete login when user opens email link
- * Auto-provisions /users/{uid}
+ * ⚠️ NO provisioning happens here anymore
  */
 export async function completeEmailLogin() {
   const href = window.location.href;
@@ -47,19 +47,6 @@ export async function completeEmailLogin() {
 
   const result = await signInWithEmailLink(auth, email, href);
   window.localStorage.removeItem(STORAGE_KEY);
-
-  try {
-    const invite = await findPendingInviteByEmail(email);
-    const role = invite?.role || "staff";
-
-    await ensureUserProfile({
-      uid: result.user.uid,
-      email: result.user.email,
-      role,
-    });
-  } catch (e) {
-    console.error("ensureUserProfile failed:", e);
-  }
 
   return result.user;
 }

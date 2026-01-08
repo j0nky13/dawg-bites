@@ -13,6 +13,7 @@ import Stats from "./pages/Stats";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
+import Leads from "./pages/Leads";
 
 export default function PortalApp() {
   const [authUser, setAuthUser] = useState(null);
@@ -31,27 +32,25 @@ export default function PortalApp() {
         return;
       }
 
-      setLoading(true);
-
       try {
         const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
 
-        if (snap.exists()) {
-          setProfile({ uid: user.uid, ...snap.data() });
-        } else {
+        if (!snap.exists()) {
           const newProfile = {
             email: user.email || "",
-            role: "staff",
+            role: "admin", // 👈 YOU can change this later
             active: true,
             createdAt: serverTimestamp(),
           };
 
           await setDoc(ref, newProfile);
           setProfile({ uid: user.uid, ...newProfile });
+        } else {
+          setProfile({ uid: user.uid, ...snap.data() });
         }
       } catch (err) {
-        console.error("Portal boot failed", err);
+        console.error("Portal boot failed:", err);
         setBootErr(err.message || "Portal boot failed");
         setProfile(null);
       } finally {
@@ -64,7 +63,7 @@ export default function PortalApp() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center text-sm text-slate-400 bg-black">
+      <div className="h-screen flex items-center justify-center bg-black text-slate-400">
         Loading portal…
       </div>
     );
@@ -76,12 +75,9 @@ export default function PortalApp() {
 
   if (!profile) {
     return (
-      <div className="h-screen flex items-center justify-center bg-black text-white p-6">
-        <div className="max-w-lg w-full rounded-xl border border-slate-800 bg-slate-950 p-4">
-          <div className="text-sm font-semibold">Portal Error</div>
-          <div className="text-xs text-red-300 mt-2">
-            {bootErr || "Profile failed to load"}
-          </div>
+      <div className="h-screen flex items-center justify-center bg-black text-white">
+        <div className="p-4 rounded-xl border border-red-500">
+          Portal Error: {bootErr || "Profile failed to load"}
         </div>
       </div>
     );
@@ -92,10 +88,8 @@ export default function PortalApp() {
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard profile={profile} />} />
         <Route path="/projects" element={<Projects profile={profile} />} />
-        <Route
-          path="/projects/:id"
-          element={<ProjectDetail profile={profile} />}
-        />
+        <Route path="/leads" element={<Leads profile={profile} />} />
+        <Route path="/projects/:id" element={<ProjectDetail profile={profile} />} />
         <Route path="/inbox" element={<Inbox profile={profile} />} />
         <Route path="/stats" element={<Stats profile={profile} />} />
         <Route path="/settings" element={<Settings profile={profile} />} />

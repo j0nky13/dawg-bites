@@ -1,11 +1,12 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LogOut, User } from "lucide-react";
-import { logout } from "../lib/auth"; // ✅ adjust path if needed
+import { logout } from "../lib/auth";
 
 const GREEN = "#B6F24A";
 
 const nav = [
   { label: "Dashboard", to: "/portal", end: true },
+  { label: "Leads", to: "/portal/leads" }, // ✅ ADDED
   { label: "Projects", to: "/portal/projects" },
   { label: "Inbox", to: "/portal/inbox" },
   { label: "Stats", to: "/portal/stats" },
@@ -15,17 +16,16 @@ const nav = [
 export default function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
 
-  // TEMP user placeholder – wire to profile hook later
+  // TEMP user placeholder – wire to profile later
   const user = {
     name: "Admin User",
-    email: "admin@marshmonster.io",
   };
 
   const handleSignOut = async () => {
     try {
-      await logout();            // 🔐 Firebase sign out
-      onNavigate?.();            // 📱 close mobile sidebar if open
-      navigate("/portal/login"); // 🚪 redirect to login
+      await logout();
+      onNavigate?.();
+      navigate("/portal/login");
     } catch (err) {
       console.error("Logout failed:", err);
     }
@@ -36,7 +36,7 @@ export default function Sidebar({ onNavigate }) {
       className="flex flex-col h-full bg-[#0A0A0A]"
       style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
     >
-      {/* Header / Brand */}
+      {/* Header */}
       <div
         className="h-16 px-6 flex flex-col justify-center border-b"
         style={{ borderColor: "rgba(255,255,255,0.08)" }}
@@ -45,10 +45,7 @@ export default function Sidebar({ onNavigate }) {
           className="text-xl font-bold tracking-wide leading-none"
           style={{ color: GREEN }}
         >
-          Marsh Monster
-        </div>
-        <div className="text-xs text-slate-500 mt-1">
-          Internal Portal
+          Dawg Bites
         </div>
       </div>
 
@@ -100,9 +97,6 @@ export default function Sidebar({ onNavigate }) {
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate text-slate-200">
               {user.name}
-            </div>
-            <div className="text-xs text-slate-500 truncate">
-              {user.email}
             </div>
           </div>
         </div>
