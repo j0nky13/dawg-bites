@@ -1,7 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
-import logo from "/dawgbites-logo.png";
+
 const linkBase = "transition-colors hover:text-[#982810]";
 const active = "text-[#982810] font-semibold";
 
@@ -21,9 +21,9 @@ export default function NavBar() {
       const currentY = window.scrollY;
 
       if (currentY > lastScrollY && currentY > 80) {
-        setVisible(false); // scrolling down
+        setVisible(false);
       } else {
-        setVisible(true); // scrolling up
+        setVisible(true);
       }
 
       setLastScrollY(currentY);
@@ -37,23 +37,23 @@ export default function NavBar() {
     <header
       className={`
         fixed top-0 left-0 right-0 z-50
-        transition-all duration-300 ease-out
-        ${visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"}
+        transition-transform duration-300 ease-out
+        ${visible ? "translate-y-0" : "-translate-y-full"}
       `}
     >
       <div className="bg-[#E6D2AC] shadow-sm">
         <div className="relative max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          {/* LOGO (fully tied to navbar visibility) */}
+          {/* LOGO */}
           <Link
             to="/"
             className="absolute left-6"
             style={{ bottom: "-22px" }}
           >
-           <img
-  src={logo}
-  alt="Dawg Bites"
-  className="h-20 w-auto"
-/>
+            <img
+              src="/dawgbites-logo.png"
+              alt="Dawg Bites"
+              className="h-20 w-auto drop-shadow-lg"
+            />
           </Link>
 
           {/* Desktop Nav */}
@@ -90,7 +90,7 @@ export default function NavBar() {
         </div>
       </div>
 
-      {/* Mobile Menu (only when nav is visible) */}
+      {/* Mobile Menu */}
       {open && visible && (
         <div className="md:hidden px-4 mt-2">
           <div className="bg-[#F6F0E3] rounded-2xl shadow-xl border border-black/10 p-6">
