@@ -6,14 +6,13 @@ import { onUserChanged } from "./lib/auth";
 import { db } from "../../lib/firebase";
 
 import Dashboard from "./pages/Dashboard";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
 import Inbox from "./pages/Inbox";
 import Stats from "./pages/Stats";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Leads from "./pages/Leads";
+import Customers from "./pages/Customers"; // ✅ NEW
 
 export default function PortalApp() {
   const [authUser, setAuthUser] = useState(null);
@@ -39,7 +38,7 @@ export default function PortalApp() {
         if (!snap.exists()) {
           const newProfile = {
             email: user.email || "",
-            role: "admin", // 👈 YOU can change this later
+            role: "admin",
             active: true,
             createdAt: serverTimestamp(),
           };
@@ -87,9 +86,8 @@ export default function PortalApp() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard profile={profile} />} />
-        <Route path="/projects" element={<Projects profile={profile} />} />
         <Route path="/leads" element={<Leads profile={profile} />} />
-        <Route path="/projects/:id" element={<ProjectDetail profile={profile} />} />
+        <Route path="/customers" element={<Customers profile={profile} />} /> {/* ✅ NEW */}
         <Route path="/inbox" element={<Inbox profile={profile} />} />
         <Route path="/stats" element={<Stats profile={profile} />} />
         <Route path="/settings" element={<Settings profile={profile} />} />

@@ -1,13 +1,15 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LogOut, User } from "lucide-react";
 import { logout } from "../lib/auth";
+import logo from "../../../assets/dawgbites-logo.png";
+
 
 const GREEN = "#B6F24A";
 
 const nav = [
   { label: "Dashboard", to: "/portal", end: true },
-  { label: "Leads", to: "/portal/leads" }, // ✅ ADDED
-  { label: "Projects", to: "/portal/projects" },
+  { label: "Leads", to: "/portal/leads" },
+  { label: "Customers", to: "/portal/customers" }, // ✅ NEW
   { label: "Inbox", to: "/portal/inbox" },
   { label: "Stats", to: "/portal/stats" },
   { label: "Settings", to: "/portal/settings" },
@@ -37,15 +39,19 @@ export default function Sidebar({ onNavigate }) {
       style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}
     >
       {/* Header */}
-      <div
-        className="h-16 px-6 flex flex-col justify-center border-b"
-        style={{ borderColor: "rgba(255,255,255,0.08)" }}
-      >
+     <div
+  className="h-20 px-6 flex items-center justify-center border-b pt-3"
+  style={{ borderColor: "rgba(255,255,255,0.08)" }}
+>
         <div
           className="text-xl font-bold tracking-wide leading-none"
           style={{ color: GREEN }}
         >
-          Dawg Bites
+           <img
+    src={logo}
+    alt="Dawg Bites"
+    className="h-20 w-auto drop-shadow-lg"
+  />
         </div>
       </div>
 

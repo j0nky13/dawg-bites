@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { getLeads } from "../lib/leadsApi";
 import AddLeadModal from "../components/AddLeadModal";
+import ViewLeadModal from "../components/ViewLeadModal";
 
 const STATUS_STYLES = {
   new: "bg-neutral-700/40 text-neutral-200",
@@ -17,6 +18,7 @@ export default function Leads() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
 
   async function loadLeads() {
     const data = await getLeads();
@@ -98,10 +100,7 @@ export default function Leads() {
           <tbody className="divide-y divide-white/5">
             {loading && (
               <tr>
-                <td
-                  colSpan={5}
-                  className="px-4 py-10 text-center text-neutral-400"
-                >
+                <td colSpan={5} className="px-4 py-10 text-center text-neutral-400">
                   Loading leads…
                 </td>
               </tr>
@@ -109,10 +108,7 @@ export default function Leads() {
 
             {!loading && filtered.length === 0 && (
               <tr>
-                <td
-                  colSpan={5}
-                  className="px-4 py-12 text-center text-neutral-400"
-                >
+                <td colSpan={5} className="px-4 py-12 text-center text-neutral-400">
                   No leads found
                 </td>
               </tr>
@@ -121,7 +117,8 @@ export default function Leads() {
             {filtered.map((lead) => (
               <tr
                 key={lead.id}
-                className="hover:bg-white/5 transition"
+                onClick={() => setSelectedLead(lead)}
+                className="cursor-pointer hover:bg-white/5 transition"
               >
                 <td className="px-4 py-3 text-white font-medium">
                   {lead.name || "—"}
@@ -165,12 +162,21 @@ export default function Leads() {
         </table>
       </div>
 
-      {/* Quick Add Lead Modal */}
+      {/* Add Lead Modal */}
       <AddLeadModal
         open={showAdd}
         onClose={() => setShowAdd(false)}
         onCreated={loadLeads}
       />
+
+      {/* View Lead Modal */}
+      {selectedLead && (
+        <ViewLeadModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+          onSaved={loadLeads}
+        />
+      )}
     </div>
   );
 }
