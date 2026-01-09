@@ -7,6 +7,8 @@ import { groupByDay } from "../lib/stats.chart.utils";
 
 const TABS = ["overview", "revenue", "forecast", "leads", "export"];
 
+const TAX_RATE = 0.22; // estimated effective tax rate (configurable)
+
 export default function Stats() {
   const [projects, setProjects] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -40,6 +42,14 @@ export default function Stats() {
     return `$${Math.round(x).toLocaleString()}`;
   }
 
+  function calcTax(v) {
+    return n(v) * TAX_RATE;
+  }
+
+  function calcNet(v) {
+    return n(v) - calcTax(v);
+  }
+
   function clamp01(x) {
     return Math.max(0, Math.min(1, x));
   }
@@ -51,13 +61,27 @@ export default function Stats() {
   }
 
   function stageFromStatus(status) {
-    // Treat status as "pipeline stage" (no backend change).
-    // If you later add real stages, just replace this mapping.
+    // Keeping your status mapping intact (no backend change).
     const s = statusLabel(status);
     if (s === "completed" || s === "done") return "completed";
     if (s === "archived" || s === "canceled" || s === "cancelled") return "archived";
     if (s === "active" || s === "in_progress" || s === "in progress") return "active";
     return s;
+  }
+
+  function getDateMsFromFirestore(ts) {
+    // Firestore Timestamp: { seconds, nanoseconds }
+    if (ts?.seconds) return ts.seconds * 1000;
+    if (typeof ts === "number") return ts;
+    if (typeof ts === "string") {
+      const ms = Date.parse(ts);
+      return Number.isFinite(ms) ? ms : null;
+    }
+    return null;
+  }
+
+  function daysAgoMs(days) {
+    return Date.now() - days * 24 * 60 * 60 * 1000;
   }
 
   function csvEscape(value) {
@@ -69,7 +93,7 @@ export default function Stats() {
   }
 
   function downloadCSV(filename, rows) {
-    const csv = rows.map(r => r.map(csvEscape).join(",")).join("\n");
+    const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
@@ -85,6 +109,7 @@ export default function Stats() {
 
   /* ---------------- derived ---------------- */
 
+  
   const activeProjects = useMemo(
     () => projects.filter((p) => stageFromStatus(p.status) === "active"),
     [projects]
@@ -105,15 +130,9 @@ export default function Stats() {
     [projects]
   );
 
-  const activeRevenue = useMemo(
-    () => activeProjects.reduce((sum, p) => sum + n(p.budget), 0),
-    [activeProjects]
-  );
+  const totalTax = useMemo(() => calcTax(totalRevenue), [totalRevenue]);
 
-  const completedRevenue = useMemo(
-    () => completedProjects.reduce((sum, p) => sum + n(p.budget), 0),
-    [completedProjects]
-  );
+  const totalNet = useMemo(() => calcNet(totalRevenue), [totalRevenue]);
 
   const unreadLeads = useMemo(
     () => messages.filter((m) => String(m.status || "").toLowerCase() === "new"),
@@ -121,7 +140,12 @@ export default function Stats() {
   );
 
   const convertedLeads = useMemo(
-    () => messages.filter((m) => !!m.convertedToProject || String(m.status || "").toLowerCase() === "converted"),
+    () =>
+      messages.filter(
+        (m) =>
+          !!m.convertedToProject ||
+          String(m.status || "").toLowerCase() === "converted"
+      ),
     [messages]
   );
 
@@ -136,19 +160,31 @@ export default function Stats() {
     [messages]
   );
 
-  /* ---------------- forecasting model ----------------
-     We can’t assume perfect data exists, so we keep it resilient:
-     - If budgets exist: use them.
-     - If not: fallback to avg project value from whatever budgets exist.
-     - Confidence bands use a simple variance heuristic:
-       - If there’s enough budget history, use std deviation to set bands.
-       - Otherwise use percent bands.
-  ----------------------------------------------------- */
+  /* ---------------- forecasting model ----------- */
 
   const forecast = useMemo(() => {
     const budgets = projects.map((p) => n(p.budget)).filter((x) => x > 0);
 
     const avg = budgets.length ? budgets.reduce((a, b) => a + b, 0) / budgets.length : 0;
+
+    // Pull last-30-day revenue when timestamps exist; fallback to overall avg if not.
+    const cutoff = daysAgoMs(30);
+
+    const last30 = projects
+      .map((p) => {
+        const ms = getDateMsFromFirestore(p.createdAt) ?? getDateMsFromFirestore(p.updatedAt);
+        return { ms, budget: n(p.budget) };
+      })
+      .filter((x) => x.budget > 0);
+
+    const last30WithDates = last30.filter((x) => x.ms && x.ms >= cutoff);
+    const last30Revenue = last30WithDates.reduce((s, r) => s + r.budget, 0);
+
+    // If we have dated revenue, use daily velocity.
+    // If not, assume “avg sale * (sales count / days)” as a fallback.
+    const expectedMonthly = last30WithDates.length
+      ? (last30Revenue / 30) * 30
+      : avg * Math.max(1, Math.round(projects.length / 2)); // fallback heuristic
 
     // Std dev if we have enough samples; else fallback
     let std = 0;
@@ -158,14 +194,10 @@ export default function Stats() {
       std = Math.sqrt(variance);
     }
 
-    // Expected monthly = avg project value * active count (simple)
-    const expectedMonthly = avg * Math.max(1, activeProjects.length);
-
     // Bands:
-    // If std exists, scale with active count but dampen a bit (sqrt).
-    // Else fallback to +/- 25% / 45%.
-    const bandTight = std > 0 ? (std * Math.sqrt(Math.max(1, activeProjects.length)) * 0.6) : expectedMonthly * 0.25;
-    const bandWide = std > 0 ? (std * Math.sqrt(Math.max(1, activeProjects.length)) * 1.0) : expectedMonthly * 0.45;
+    // If std exists, use it; else use percent bands.
+    const bandTight = std > 0 ? std * 0.6 : expectedMonthly * 0.25;
+    const bandWide = std > 0 ? std * 1.0 : expectedMonthly * 0.45;
 
     const months = [
       { label: "30 days", mult: 1 },
@@ -191,17 +223,19 @@ export default function Stats() {
     });
 
     return {
-      avgProjectValue: avg,
+      avgProjectValue: avg, // keeping key name so nothing else breaks
       expectedMonthly,
       series,
+      last30Revenue: Math.round(last30Revenue),
+      last30Count: last30WithDates.length,
     };
-  }, [projects, activeProjects]);
+  }, [projects]);
 
   /* ---------------- forecast by stage ---------------- */
 
   const stageForecast = useMemo(() => {
-    // Use existing status as stage. Projected revenue is “what’s in the pipe”
-    // We do: active = 80% weight, completed = 100%, archived = 0%.
+    // Keeping your stage table intact (it’s still useful as a breakdown by status).
+    // For a food truck, status can still mean: recorded / reconciled / paid / void / etc.
     const weights = {
       active: 0.8,
       completed: 1.0,
@@ -215,7 +249,7 @@ export default function Stats() {
       byStage[stage] = byStage[stage] || { stage, count: 0, revenue: 0, weighted: 0 };
       byStage[stage].count += 1;
       byStage[stage].revenue += budget;
-      const w = weights[stage] ?? 0.5; // unknown stages = 50%
+      const w = weights[stage] ?? 0.5;
       byStage[stage].weighted += budget * w;
     }
 
@@ -228,6 +262,8 @@ export default function Stats() {
   /* ---------------- per-client stats + forecast ---------------- */
 
   const clients = useMemo(() => {
+    // Keeping this intact, but in your sales world this can become:
+    // customer email/name OR later “locations” when you add that field.
     const map = new Map();
 
     for (const p of projects) {
@@ -257,11 +293,10 @@ export default function Stats() {
       if (stage === "archived") row.archived += budget;
     }
 
-    // Simple “next 30 day” client projection = their active revenue * 0.8
     const out = Array.from(map.values())
       .map((r) => ({
         ...r,
-        projected30: Math.round(r.active * 0.8),
+        projected30: Math.round(r.total), // more honest than “active * 0.8” for sales
       }))
       .sort((a, b) => (b.projected30 || 0) - (a.projected30 || 0));
 
@@ -275,7 +310,6 @@ export default function Stats() {
     const converted = convertedLeads.length || 0;
     const overall = total ? converted / total : 0;
 
-    // Status rates
     const byStatus = {};
     for (const m of messages) {
       const s = String(m.status || "unknown").toLowerCase();
@@ -291,8 +325,6 @@ export default function Stats() {
       }))
       .sort((a, b) => (b.rate || 0) - (a.rate || 0));
 
-    // Simple lead scoring (no ML, deterministic):
-    // new=0.25, open=0.5, closed=0.1, converted=1.0, unknown=0.3
     const scoreMap = {
       new: 0.25,
       open: 0.5,
@@ -304,7 +336,6 @@ export default function Stats() {
       const s = String(m.status || "unknown").toLowerCase();
       const base = scoreMap[s] ?? 0.3;
 
-      // bonus if has name + longer message
       const nameBonus = m.name ? 0.05 : 0;
       const lengthBonus = m.message && String(m.message).length > 200 ? 0.05 : 0;
 
@@ -331,9 +362,9 @@ export default function Stats() {
     <div className="space-y-6 max-w-6xl overflow-x-hidden">
       {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-semibold">Stats</h1>
+        <h1 className="text-2xl font-semibold">Business Stats</h1>
         <p className="text-sm text-slate-400">
-          Trends, pipeline, forecasting, and exports.
+          Sales totals, revenue trends, lead activity, and quick forecasting.
         </p>
       </div>
 
@@ -357,10 +388,11 @@ export default function Stats() {
       {/* ---------------- OVERVIEW ---------------- */}
       {tab === "overview" && (
         <>
+          {/* NOTE: This is what you asked for: NO “active jobs / completed jobs” cards. */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard label="Total Projects" value={projects.length} />
-            <StatCard label="Active Projects" value={activeProjects.length} />
-            <StatCard label="Completed Projects" value={completedProjects.length} />
+            <StatCard label="Total Sales Entries" value={projects.length} />
+            <StatCard label="Gross Revenue" value={money(totalRevenue)} highlight={totalRevenue > 0} />
+            <StatCard label="Net Revenue (Est.)" value={money(totalNet)} highlight={totalNet > 0} />
             <StatCard
               label="Unread Leads"
               value={unreadLeads.length}
@@ -384,19 +416,19 @@ export default function Stats() {
       {tab === "revenue" && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard label="Total Revenue" value={money(totalRevenue)} highlight={totalRevenue > 0} />
-            <StatCard label="Active Revenue" value={money(activeRevenue)} />
-            <StatCard label="Completed Revenue" value={money(completedRevenue)} />
-            <StatCard label="Avg Project Value" value={money(forecast.avgProjectValue)} />
+            <StatCard label="Gross Revenue" value={money(totalRevenue)} highlight={totalRevenue > 0} />
+            <StatCard label="Estimated Tax" value={money(totalTax)} />
+            <StatCard label="Net Revenue" value={money(totalNet)} highlight />
+            <StatCard label="Avg Sale Amount" value={money(forecast.avgProjectValue)} />
           </div>
 
-          <Card title="Pipeline by Stage (from project.status)">
+          <Card title="Revenue Breakdown by Status">
             <div className="overflow-auto">
               <table className="w-full text-sm">
                 <thead className="text-slate-400">
                   <tr className="border-b border-white/10">
-                    <th className="text-left py-2 pr-3">Stage</th>
-                    <th className="text-right py-2 px-3">Projects</th>
+                    <th className="text-left py-2 pr-3">Status</th>
+                    <th className="text-right py-2 px-3">Entries</th>
                     <th className="text-right py-2 px-3">Raw Revenue</th>
                     <th className="text-right py-2 pl-3">Weighted</th>
                   </tr>
@@ -423,14 +455,14 @@ export default function Stats() {
             </div>
           </Card>
 
-          <Card title="Top Clients (by projected 30 days)">
+          <Card title="Top Customers (by projected 30 days)">
             <div className="overflow-auto">
               <table className="w-full text-sm">
                 <thead className="text-slate-400">
                   <tr className="border-b border-white/10">
-                    <th className="text-left py-2 pr-3">Client</th>
+                    <th className="text-left py-2 pr-3">Name</th>
                     <th className="text-left py-2 pr-3">Email</th>
-                    <th className="text-right py-2 px-3">Projects</th>
+                    <th className="text-right py-2 px-3">Entries</th>
                     <th className="text-right py-2 px-3">Total</th>
                     <th className="text-right py-2 pl-3">Projected 30d</th>
                   </tr>
@@ -448,7 +480,7 @@ export default function Stats() {
                   {clients.length === 0 && (
                     <tr>
                       <td className="py-4 text-slate-500" colSpan={5}>
-                        No client data yet.
+                        No customer data yet.
                       </td>
                     </tr>
                   )}
@@ -462,13 +494,26 @@ export default function Stats() {
       {/* ---------------- FORECAST ---------------- */}
       {tab === "forecast" && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <StatCard label="Gross Revenue" value={money(totalRevenue)} />
+            <StatCard label="Last 30 Days Revenue" value={money(forecast.last30Revenue)} highlight={forecast.last30Revenue > 0} />
+            <StatCard label="Last 30 Entries" value={forecast.last30Count} />
+            <StatCard label="Avg Sale Amount" value={money(forecast.avgProjectValue)} />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <StatCard label="Projected 30 days" value={money(forecast.series[0]?.expected)} highlight />
             <StatCard label="Projected 60 days" value={money(forecast.series[1]?.expected)} />
             <StatCard label="Projected 90 days" value={money(forecast.series[2]?.expected)} />
           </div>
 
-          <Card title="Forecast Bands (Low / Likely / High)">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <StatCard label="Net 30 days" value={money(calcNet(forecast.series[0]?.expected))} />
+            <StatCard label="Net 60 days" value={money(calcNet(forecast.series[1]?.expected))} />
+            <StatCard label="Net 90 days" value={money(calcNet(forecast.series[2]?.expected))} />
+          </div>
+
+          <Card title="Revenue Forecast Bands">
             <div className="overflow-auto">
               <table className="w-full text-sm">
                 <thead className="text-slate-400">
@@ -497,7 +542,7 @@ export default function Stats() {
             </div>
 
             <div className="mt-3 text-xs text-slate-500">
-              Bands are derived from your budget history (std dev if available) + active pipeline count.
+              Bands are derived from your recent revenue history (fallback-safe when timestamps are missing).
             </div>
           </Card>
         </>
@@ -594,8 +639,8 @@ export default function Stats() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ActionCard
-              title="Export Projects CSV"
-              desc="Projects list including budget, status, client, and timestamps."
+              title="Export Sales CSV"
+              desc="Sales entries including amount, status, and timestamps."
               onClick={() => {
                 const rows = [
                   ["id", "title", "clientName", "clientEmail", "status", "budget", "pages", "goal", "domain", "graphics", "createdAt", "updatedAt", "source", "sourceMessageId"],
@@ -616,7 +661,7 @@ export default function Stats() {
                     p.sourceMessageId || "",
                   ]),
                 ];
-                downloadCSV("projects.csv", rows);
+                downloadCSV("sales.csv", rows);
               }}
             />
 
@@ -667,11 +712,19 @@ export default function Stats() {
           <Card title="Quick Summary">
             <div className="text-sm text-slate-300 space-y-2">
               <div>
-                <span className="text-slate-500">Total Revenue:</span>{" "}
+                <span className="text-slate-500">Gross Revenue:</span>{" "}
                 <span className="text-[#B6F24A] font-semibold">{money(totalRevenue)}</span>
               </div>
               <div>
-                <span className="text-slate-500">Weighted Pipeline:</span>{" "}
+                <span className="text-slate-500">Estimated Tax:</span>{" "}
+                <span className="text-[#B6F24A] font-semibold">{money(totalTax)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Net Revenue:</span>{" "}
+                <span className="text-[#B6F24A] font-semibold">{money(totalNet)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Weighted Breakdown:</span>{" "}
                 <span className="text-[#B6F24A] font-semibold">{money(stageForecast.totalWeighted)}</span>
               </div>
               <div>

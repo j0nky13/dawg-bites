@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, Plus } from "lucide-react";
-import { getLeads } from "../lib/leadsApi";
+import { getLeads, updateLead } from "../lib/leadsApi";
 import AddLeadModal from "../components/AddLeadModal";
 import ViewLeadModal from "../components/ViewLeadModal";
 
@@ -174,11 +174,7 @@ export default function Leads() {
               <tr
                 key={lead.id}
                 onClick={() => setSelectedLead(lead)}
-                className="
-                  cursor-pointer
-                  hover:bg-white/5
-                  transition
-                "
+                className="cursor-pointer hover:bg-white/5 transition"
               >
                 <td className="px-4 py-3 text-white font-medium">
                   {lead.name || "—"}
@@ -234,7 +230,10 @@ export default function Leads() {
         <ViewLeadModal
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
-          onSaved={loadLeads}
+          onSave={async (data) => {
+            await updateLead(selectedLead.id, data);
+            await loadLeads();
+          }}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { X, Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 import { updateLead, LEAD_STATUSES } from "../lib/leadsApi";
 
 const INPUT =
@@ -14,6 +14,26 @@ export default function ViewCustomerModal({
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  /* ---------------------------------------------
+     ✅ ALL HOOKS MUST RUN BEFORE ANY EARLY RETURN
+  ---------------------------------------------- */
+
+  // ---------- Derived contract metrics (read-only) ----------
+  const ratePerDay = useMemo(() => {
+    if (!form) return "";
+    const days = Number(form.monthlyDays);
+    const total = Number(form.monthlyContractValue);
+    if (!days || !total) return "";
+    return Math.round(total / days);
+  }, [form]);
+
+  const ratePerHour = useMemo(() => {
+    if (!form) return "";
+    const hours = Number(form.hoursPerDay);
+    if (!hours || !ratePerDay) return "";
+    return Math.round(ratePerDay / hours);
+  }, [form, ratePerDay]);
+
   useEffect(() => {
     if (customer) {
       setForm({
@@ -25,10 +45,18 @@ export default function ViewCustomerModal({
         status: customer.status || "won",
         temperature: customer.temperature || "hot",
         madeContact: customer.madeContact || false,
+
+        // 🔽 CONTRACT FIELDS
+        monthlyDays: customer.monthlyDays || "",
+        hoursPerDay: customer.hoursPerDay || "",
+        monthlyContractValue: customer.monthlyContractValue || "",
       });
     }
   }, [customer]);
 
+  /* ---------------------------------------------
+     ✅ EARLY RETURN — NOW SAFE
+  ---------------------------------------------- */
   if (!open || !form) return null;
 
   function update(field, value) {
@@ -38,7 +66,12 @@ export default function ViewCustomerModal({
   async function save() {
     setSaving(true);
     try {
-      await updateLead(customer.id, form);
+      await updateLead(customer.id, {
+        ...form,
+        monthlyDays: Number(form.monthlyDays) || 0,
+        hoursPerDay: Number(form.hoursPerDay) || 0,
+        monthlyContractValue: Number(form.monthlyContractValue) || 0,
+      });
       onUpdated?.();
       onClose();
     } finally {
@@ -137,11 +170,56 @@ export default function ViewCustomerModal({
             </select>
           </div>
 
+          {/* 🧾 Contract Details */}
+          <div className="border border-white/10 rounded-md p-3 space-y-3">
+            <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wide">
+              Contract Terms
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <input
+                className={INPUT}
+                type="number"
+                placeholder="Days / Month"
+                value={form.monthlyDays}
+                onChange={(e) => update("monthlyDays", e.target.value)}
+              />
+
+              <input
+                className={INPUT}
+                type="number"
+                placeholder="Hours / Day"
+                value={form.hoursPerDay}
+                onChange={(e) => update("hoursPerDay", e.target.value)}
+              />
+
+              <input
+                className={INPUT}
+                type="number"
+                placeholder="Monthly $"
+                value={form.monthlyContractValue}
+                onChange={(e) =>
+                  update("monthlyContractValue", e.target.value)
+                }
+              />
+            </div>
+
+            {/* Derived */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`${INPUT} bg-neutral-900 text-neutral-400`}>
+                ${ratePerDay || "—"} / day
+              </div>
+              <div className={`${INPUT} bg-neutral-900 text-neutral-400`}>
+                ${ratePerHour || "—"} / hour
+              </div>
+            </div>
+          </div>
+
           {/* Notes */}
           <textarea
             rows={4}
             className={`${INPUT} resize-none`}
-            placeholder="Customer notes, preferences, history…"
+            placeholder="Notes: expected hot dogs sold, staffing needs, event details…"
             value={form.notes}
             onChange={(e) => update("notes", e.target.value)}
           />
@@ -161,7 +239,6 @@ export default function ViewCustomerModal({
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold bg-[#B6F24A] text-black disabled:opacity-50"
           >
-            {/* <Save size={14} /> */}
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
