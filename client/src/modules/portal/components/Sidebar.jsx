@@ -122,7 +122,7 @@ export default function Sidebar({ onNavigate }) {
         </button>
 
         <div className="mt-3 text-center text-xs text-slate-500">
-          Marsh Monster • v0.1.0
+          Monster CRM • v0.1.0
         </div>
       </div>
     </div>
