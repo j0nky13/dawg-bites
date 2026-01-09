@@ -17,23 +17,43 @@ export default function ViewLeadModal({ lead, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur">
-      <div className="w-full max-w-2xl rounded-2xl bg-[#121212] border border-white/10 shadow-xl">
-        
+    <div
+      className="
+        fixed inset-0 z-50
+        flex items-start md:items-center justify-center
+        bg-black/60 backdrop-blur
+        overflow-y-auto
+      "
+    >
+      <div
+        className="
+          w-full max-w-2xl
+          m-4 md:m-0
+          rounded-2xl
+          bg-[#121212]
+          border border-white/10
+          shadow-xl
+          max-h-[calc(100vh-2rem)]
+          flex flex-col
+        "
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div>
-            <h2 className="text-lg font-semibold">{form.name}</h2>
-            <p className="text-sm text-white/60">{form.business}</p>
+            <h2 className="text-lg font-semibold text-white">
+              {form.name || "Lead"}
+            </h2>
+            <p className="text-sm text-white/60">
+              {form.business || "—"}
+            </p>
           </div>
           <button onClick={onClose}>
             <X className="w-5 h-5 text-white/60 hover:text-white" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          
+        {/* Body (SCROLLABLE) */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
           <Input label="Name" value={form.name} onChange={v => update("name", v)} />
           <Input label="Business" value={form.business} onChange={v => update("business", v)} />
           <Input label="Phone" value={form.phone} onChange={v => update("phone", v)} />
@@ -42,14 +62,14 @@ export default function ViewLeadModal({ lead, onClose, onSave }) {
           <Select
             label="Status"
             value={form.status}
-            options={["New", "Contacted", "Qualified", "Converted"]}
+            options={["new", "contacted", "qualified", "won", "lost"]}
             onChange={v => update("status", v)}
           />
 
           <Select
             label="Temperature"
             value={form.temperature}
-            options={["Cold", "Warm", "Hot"]}
+            options={["cold", "warm", "hot"]}
             onChange={v => update("temperature", v)}
           />
 
@@ -64,7 +84,13 @@ export default function ViewLeadModal({ lead, onClose, onSave }) {
             <textarea
               value={form.notes || ""}
               onChange={e => update("notes", e.target.value)}
-              className="mt-1 w-full h-28 rounded-lg bg-black/40 border border-white/10 p-3 focus:outline-none focus:ring-1 focus:ring-lime-400"
+              className="
+                mt-1 w-full h-28
+                rounded-lg bg-black/40
+                border border-white/10
+                p-3
+                focus:outline-none focus:ring-1 focus:ring-lime-400
+              "
             />
           </div>
         </div>
@@ -80,7 +106,12 @@ export default function ViewLeadModal({ lead, onClose, onSave }) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 rounded-lg bg-lime-400 text-black font-semibold hover:bg-lime-300 disabled:opacity-50"
+            className="
+              px-4 py-2 rounded-lg
+              bg-lime-400 text-black font-semibold
+              hover:bg-lime-300
+              disabled:opacity-50
+            "
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>
@@ -90,7 +121,7 @@ export default function ViewLeadModal({ lead, onClose, onSave }) {
   );
 }
 
-/* ---------- Small Inputs ---------- */
+/* ---------- Inputs ---------- */
 
 function Input({ label, value, onChange }) {
   return (
@@ -99,7 +130,12 @@ function Input({ label, value, onChange }) {
       <input
         value={value || ""}
         onChange={e => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg bg-black/40 border border-white/10 p-2 focus:outline-none focus:ring-1 focus:ring-lime-400"
+        className="
+          mt-1 w-full rounded-lg
+          bg-black/40 border border-white/10
+          p-2
+          focus:outline-none focus:ring-1 focus:ring-lime-400
+        "
       />
     </div>
   );
@@ -112,10 +148,16 @@ function Select({ label, value, options, onChange }) {
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg bg-black/40 border border-white/10 p-2"
+        className="
+          mt-1 w-full rounded-lg
+          bg-black/40 border border-white/10
+          p-2
+        "
       >
         {options.map(opt => (
-          <option key={opt} value={opt}>{opt}</option>
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
         ))}
       </select>
     </div>
