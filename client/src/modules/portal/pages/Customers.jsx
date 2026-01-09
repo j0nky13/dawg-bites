@@ -31,7 +31,7 @@ export default function Customers() {
   );
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Customers</h1>
@@ -41,7 +41,7 @@ export default function Customers() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
+      <div className="relative w-full md:max-w-sm">
         <Search
           size={16}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
@@ -59,9 +59,60 @@ export default function Customers() {
         />
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-neutral-900">
-        <table className="w-full text-sm">
+      {/* ================= MOBILE CARDS ================= */}
+      <div className="md:hidden space-y-3">
+        {loading && (
+          <div className="py-10 text-center text-neutral-400">
+            Loading customers…
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="py-12 text-center text-neutral-400">
+            No customers found
+          </div>
+        )}
+
+        {filtered.map((customer) => (
+          <div
+            key={customer.id}
+            onClick={() => setSelected(customer)}
+            className="
+              rounded-xl
+              border border-white/10
+              bg-neutral-900
+              p-4
+              space-y-2
+              cursor-pointer
+              active:bg-white/5
+            "
+          >
+            <div className="font-semibold text-white">
+              {customer.name || "—"}
+            </div>
+
+            <div className="text-sm text-neutral-400">
+              {customer.business || "No business"}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-neutral-500 pt-1">
+              <span>
+                {customer.phone || customer.email || "—"}
+              </span>
+
+              <span>
+                {customer.updatedAt?.toDate
+                  ? customer.updatedAt.toDate().toLocaleDateString()
+                  : "—"}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= DESKTOP TABLE ================= */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-neutral-900">
+        <table className="min-w-[700px] w-full text-sm">
           <thead className="bg-neutral-800 text-neutral-300">
             <tr>
               <th className="px-4 py-3 text-left font-medium">Name</th>
@@ -72,30 +123,18 @@ export default function Customers() {
           </thead>
 
           <tbody className="divide-y divide-white/5">
-            {loading && (
-              <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-neutral-400">
-                  Loading customers…
-                </td>
-              </tr>
-            )}
-
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-12 text-center text-neutral-400">
-                  No customers found
-                </td>
-              </tr>
-            )}
-
             {filtered.map((customer) => (
               <tr
                 key={customer.id}
                 onClick={() => setSelected(customer)}
-                className="cursor-pointer hover:bg-white/5 transition"
+                className="
+                  cursor-pointer
+                  hover:bg-white/5
+                  transition
+                "
               >
                 <td className="px-4 py-3 text-white font-medium">
-                  {customer.name}
+                  {customer.name || "—"}
                 </td>
 
                 <td className="px-4 py-3 text-neutral-300">

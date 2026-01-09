@@ -38,9 +38,9 @@ export default function Leads() {
   );
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Leads</h1>
           <p className="text-sm text-neutral-400">
@@ -51,11 +51,12 @@ export default function Leads() {
         <button
           onClick={() => setShowAdd(true)}
           className="
-            inline-flex items-center gap-2
+            inline-flex items-center justify-center gap-2
             rounded-lg px-4 py-2
             text-sm font-semibold
             bg-[#B6F24A] text-black
             hover:opacity-90 transition
+            w-full md:w-auto
           "
         >
           <Plus size={16} />
@@ -64,7 +65,7 @@ export default function Leads() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
+      <div className="relative w-full md:max-w-sm">
         <Search
           size={16}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
@@ -84,9 +85,80 @@ export default function Leads() {
         />
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-neutral-900">
-        <table className="w-full text-sm">
+      {/* ================= MOBILE CARDS ================= */}
+      <div className="md:hidden space-y-3">
+        {loading && (
+          <div className="py-10 text-center text-neutral-400">
+            Loading leads…
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="py-12 text-center text-neutral-400">
+            No leads found
+          </div>
+        )}
+
+        {filtered.map((lead) => (
+          <div
+            key={lead.id}
+            onClick={() => setSelectedLead(lead)}
+            className="
+              rounded-xl
+              border border-white/10
+              bg-neutral-900
+              p-4
+              space-y-2
+              cursor-pointer
+              active:bg-white/5
+            "
+          >
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-white">
+                {lead.name || "—"}
+              </div>
+
+              <span
+                className={`
+                  inline-flex items-center px-2 py-1 rounded-md
+                  text-xs font-semibold capitalize
+                  ${
+                    STATUS_STYLES[lead.status] ||
+                    "bg-neutral-700/40 text-neutral-300"
+                  }
+                `}
+              >
+                {lead.status}
+              </span>
+            </div>
+
+            <div className="text-sm text-neutral-400">
+              {lead.business || "No business"}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-neutral-500 pt-1">
+              <span>
+                Contacted:{" "}
+                {lead.madeContact ? (
+                  <span className="text-[#B6F24A] font-medium">Yes</span>
+                ) : (
+                  "No"
+                )}
+              </span>
+
+              <span>
+                {lead.updatedAt?.toDate
+                  ? lead.updatedAt.toDate().toLocaleDateString()
+                  : "—"}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ================= DESKTOP TABLE ================= */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border border-white/10 bg-neutral-900">
+        <table className="min-w-[700px] w-full text-sm">
           <thead className="bg-neutral-800 text-neutral-300">
             <tr>
               <th className="px-4 py-3 text-left font-medium">Name</th>
@@ -98,27 +170,15 @@ export default function Leads() {
           </thead>
 
           <tbody className="divide-y divide-white/5">
-            {loading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-neutral-400">
-                  Loading leads…
-                </td>
-              </tr>
-            )}
-
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-neutral-400">
-                  No leads found
-                </td>
-              </tr>
-            )}
-
             {filtered.map((lead) => (
               <tr
                 key={lead.id}
                 onClick={() => setSelectedLead(lead)}
-                className="cursor-pointer hover:bg-white/5 transition"
+                className="
+                  cursor-pointer
+                  hover:bg-white/5
+                  transition
+                "
               >
                 <td className="px-4 py-3 text-white font-medium">
                   {lead.name || "—"}
