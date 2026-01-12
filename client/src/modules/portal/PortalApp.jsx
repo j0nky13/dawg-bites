@@ -13,7 +13,7 @@ import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Leads from "./pages/Leads";
 import Customers from "./pages/Customers";
-// import Sales from "./pages/Sales";
+import Sales from "./pages/Sales";
 
 export default function PortalApp() {
   const [authUser, setAuthUser] = useState(null);
@@ -89,7 +89,7 @@ export default function PortalApp() {
         <Route path="/" element={<Dashboard profile={profile} />} />
         <Route path="/leads" element={<Leads profile={profile} />} />
         <Route path="/customers" element={<Customers profile={profile} />} />
-        {/* <Route path="/sales" element={<Sales profile={profile} />} />  */}
+        <Route path="/sales" element={<Sales profile={profile} />} /> 
         <Route path="/inbox" element={<Inbox profile={profile} />} />
         <Route path="/stats" element={<Stats profile={profile} />} />
         <Route path="/settings" element={<Settings profile={profile} />} />

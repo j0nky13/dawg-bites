@@ -9,10 +9,11 @@ const nav = [
   { label: "Dashboard", to: "/portal", end: true },
   { label: "Leads", to: "/portal/leads" },
   { label: "Customers", to: "/portal/customers" },
-  // { label: "Sales", to: "/portal/sales" }, 
+  { label: "Sales", to: "/portal/sales" }, 
   { label: "Inbox", to: "/portal/inbox" },
   { label: "Stats", to: "/portal/stats" },
   { label: "Settings", to: "/portal/settings" },
+  
 ];
 
 export default function Sidebar({ onNavigate }) {

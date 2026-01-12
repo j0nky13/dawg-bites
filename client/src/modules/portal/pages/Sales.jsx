@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, X } from "lucide-react";
 
-import { getSales } from "../lib/salesApi";
-import { getExpenses } from "../lib/expensesApi";
+import { getSales, createSale } from "../lib/salesApi";
+import { getExpenses, createExpense } from "../lib/expensesApi";
+import StatsChart from "../components/StatsChart";
+import { groupByDay } from "../lib/stats.chart.utils";
 
 const TABS = ["overview", "sales", "expenses", "export"];
 const TAX_RATE = 0.22;
@@ -13,18 +15,17 @@ export default function Sales() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState("today"); // today | month | year
+
+  const [showSaleModal, setShowSaleModal] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   async function load() {
-    try {
-      const [s, e] = await Promise.all([
-        getSales(),
-        getExpenses(),
-      ]);
-      setSales(Array.isArray(s) ? s : []);
-      setExpenses(Array.isArray(e) ? e : []);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    const [s, e] = await Promise.all([getSales(), getExpenses()]);
+    setSales(Array.isArray(s) ? s : []);
+    setExpenses(Array.isArray(e) ? e : []);
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -36,42 +37,71 @@ export default function Sales() {
   const n = (v) => Number(v) || 0;
   const money = (v) => `$${Math.round(n(v)).toLocaleString()}`;
 
+  function isInPeriod(date, period) {
+    if (!date) return false;
+    const d = date.toDate ? date.toDate() : new Date(date);
+    const now = new Date();
+
+    if (period === "today") {
+      return d.toDateString() === now.toDateString();
+    }
+
+    if (period === "month") {
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+
+    if (period === "year") {
+      return d.getFullYear() === now.getFullYear();
+    }
+
+    return true;
+  }
+
   /* ---------------- derived ---------------- */
 
+  const periodSales = useMemo(
+    () => sales.filter(s => isInPeriod(s.date, period)),
+    [sales, period]
+  );
+
+  const periodExpenses = useMemo(
+    () => expenses.filter(e => isInPeriod(e.date, period)),
+    [expenses, period]
+  );
+
+  const salesSeries = useMemo(
+    () => groupByDay(periodSales, (s) => n(s.amount)),
+    [periodSales]
+  );
+
+  const expenseSeries = useMemo(
+    () => groupByDay(periodExpenses, (e) => n(e.amount)),
+    [periodExpenses]
+  );
+
   const grossRevenue = useMemo(
-    () => sales.reduce((sum, s) => sum + n(s.amount), 0),
-    [sales]
+    () => periodSales.reduce((sum, s) => sum + n(s.amount), 0),
+    [periodSales]
   );
 
   const totalExpenses = useMemo(
-    () => expenses.reduce((sum, e) => sum + n(e.amount), 0),
-    [expenses]
+    () => periodExpenses.reduce((sum, e) => sum + n(e.amount), 0),
+    [periodExpenses]
   );
 
-  const estimatedTax = useMemo(
-    () => grossRevenue * TAX_RATE,
-    [grossRevenue]
-  );
-
-  const netRevenue = useMemo(
-    () => grossRevenue - totalExpenses,
-    [grossRevenue, totalExpenses]
-  );
-
-  const takeHome = useMemo(
-    () => netRevenue - estimatedTax,
-    [netRevenue, estimatedTax]
-  );
+  const estimatedTax = grossRevenue * TAX_RATE;
+  const netRevenue = grossRevenue - totalExpenses;
+  const takeHome = netRevenue - estimatedTax;
 
   const filteredSales = sales.filter((s) =>
-    [s.customer, s.location, s.notes]
+    [s.customerName, s.description, s.notes]
       .join(" ")
       .toLowerCase()
       .includes(search.toLowerCase())
   );
 
   const filteredExpenses = expenses.filter((e) =>
-    [e.category, e.notes]
+    [e.category, e.description, e.notes]
       .join(" ")
       .toLowerCase()
       .includes(search.toLowerCase())
@@ -84,11 +114,35 @@ export default function Sales() {
   return (
     <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Sales</h1>
-        <p className="text-sm text-neutral-400">
-          Revenue, expenses, and take-home tracking
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Sales</h1>
+          <p className="text-sm text-neutral-400">
+            Revenue, expenses, and take-home tracking
+          </p>
+        </div>
+        {(tab === "sales" || tab === "expenses") && (
+          <div className="w-full md:w-auto mt-2 md:mt-0">
+            <button
+              onClick={() =>
+                tab === "sales"
+                  ? setShowSaleModal(true)
+                  : setShowExpenseModal(true)
+              }
+              className="
+                w-full md:w-auto
+                inline-flex items-center justify-center gap-2
+                px-4 py-3 md:py-2
+                rounded-lg
+                bg-[#B6F24A]
+                text-black font-semibold
+              "
+            >
+              <Plus size={16} />
+              Add {tab === "sales" ? "Sale" : "Expense"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -108,98 +162,248 @@ export default function Sales() {
         ))}
       </div>
 
-      {/* ================= OVERVIEW ================= */}
+      {/* OVERVIEW */}
       {tab === "overview" && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Stat label="Gross Revenue" value={money(grossRevenue)} />
-          <Stat label="Expenses" value={money(totalExpenses)} />
-          <Stat label="Net Revenue" value={money(netRevenue)} />
-          <Stat label="Est. Tax" value={money(estimatedTax)} />
-          <Stat
-            label="Take-Home"
-            value={money(takeHome)}
-            highlight={takeHome > 0}
-          />
-        </div>
+        <>
+          <div className="flex gap-2 mb-4">
+            {["today", "month", "year"].map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 text-xs rounded-md capitalize border ${
+                  period === p
+                    ? "bg-[#B6F24A] text-black border-[#B6F24A]"
+                    : "border-white/10 text-neutral-400 hover:text-white"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Stat label="Gross Revenue" value={money(grossRevenue)} />
+            <Stat label="Expenses" value={money(totalExpenses)} />
+            <Stat label="Net Revenue" value={money(netRevenue)} />
+            <Stat label="Est. Tax" value={money(estimatedTax)} />
+            <Stat label="Take-Home" value={money(takeHome)} highlight />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div className="bg-black/40 border border-white/10 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-neutral-300 mb-2">
+                Sales Trend
+              </h3>
+              <StatsChart data={salesSeries} />
+            </div>
+
+            <div className="bg-black/40 border border-white/10 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-neutral-300 mb-2">
+                Expense Trend
+              </h3>
+              <StatsChart data={expenseSeries} />
+            </div>
+          </div>
+        </>
       )}
 
-      {/* ================= SALES ================= */}
+      {/* SALES */}
       {tab === "sales" && (
         <>
           <SearchBar search={search} setSearch={setSearch} />
 
-          <Table
-            headers={["Date", "Customer", "Location", "Amount"]}
-            rows={filteredSales.map((s) => [
-              formatDate(s.date),
-              s.customer || "—",
-              s.location || "—",
-              money(s.amount),
-            ])}
-            empty="No sales recorded"
-          />
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {filteredSales.length === 0 && (
+              <div className="text-neutral-400 text-sm">No sales recorded</div>
+            )}
+            {filteredSales.map((s) => (
+              <MobileCard
+                key={s.id}
+                title={s.customerName || "Sale"}
+                subtitle={s.description}
+                amount={money(s.amount)}
+                meta={formatDate(s.date)}
+              />
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <Table
+              headers={["Date", "Customer", "Description", "Amount"]}
+              rows={filteredSales.map((s) => [
+                formatDate(s.date),
+                s.customerName || "—",
+                s.description || "—",
+                money(s.amount),
+              ])}
+              empty="No sales recorded"
+            />
+          </div>
         </>
       )}
 
-      {/* ================= EXPENSES ================= */}
+      {/* EXPENSES */}
       {tab === "expenses" && (
         <>
           <SearchBar search={search} setSearch={setSearch} />
 
-          <Table
-            headers={["Date", "Category", "Amount", "Notes"]}
-            rows={filteredExpenses.map((e) => [
-              formatDate(e.date),
-              e.category || "—",
-              money(e.amount),
-              e.notes || "—",
-            ])}
-            empty="No expenses recorded"
-          />
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {filteredExpenses.length === 0 && (
+              <div className="text-neutral-400 text-sm">No expenses recorded</div>
+            )}
+            {filteredExpenses.map((e) => (
+              <MobileCard
+                key={e.id}
+                title={e.category || "Expense"}
+                subtitle={e.description}
+                amount={money(e.amount)}
+                meta={formatDate(e.date)}
+              />
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <Table
+              headers={["Date", "Category", "Description", "Amount"]}
+              rows={filteredExpenses.map((e) => [
+                formatDate(e.date),
+                e.category || "—",
+                e.description || "—",
+                money(e.amount),
+              ])}
+              empty="No expenses recorded"
+            />
+          </div>
         </>
       )}
 
-      {/* ================= EXPORT ================= */}
-      {tab === "export" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <ExportCard
-            title="Export Sales"
-            onClick={() => downloadCSV("sales.csv", sales)}
-          />
-          <ExportCard
-            title="Export Expenses"
-            onClick={() => downloadCSV("expenses.csv", expenses)}
-          />
-          <ExportCard
-            title="Export Summary"
-            onClick={() =>
-              downloadCSV("summary.csv", [
-                {
-                  grossRevenue,
-                  totalExpenses,
-                  estimatedTax,
-                  takeHome,
-                },
-              ])
-            }
-          />
-        </div>
+      {/* MODALS */}
+      {showSaleModal && (
+        <AddSaleModal
+          onClose={() => setShowSaleModal(false)}
+          onSaved={load}
+        />
+      )}
+
+      {showExpenseModal && (
+        <AddExpenseModal
+          onClose={() => setShowExpenseModal(false)}
+          onSaved={load}
+        />
       )}
     </div>
   );
 }
 
-/* ---------------- UI ---------------- */
+/* ================= MODALS ================= */
+
+function AddSaleModal({ onClose, onSaved }) {
+  const [form, setForm] = useState({
+    customerName: "",
+    description: "",
+    amount: "",
+    date: new Date().toISOString().slice(0, 10),
+    notes: "",
+  });
+
+  async function save() {
+    await createSale(form);
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Modal title="Add Sale" onClose={onClose} onSave={save}>
+      <Input label="Customer" value={form.customerName} onChange={(v) => setForm(f => ({ ...f, customerName: v }))} />
+      <Input label="Description" value={form.description} onChange={(v) => setForm(f => ({ ...f, description: v }))} />
+      <Input label="Amount ($)" type="number" value={form.amount} onChange={(v) => setForm(f => ({ ...f, amount: v }))} />
+      <Input label="Date" type="date" value={form.date} onChange={(v) => setForm(f => ({ ...f, date: v }))} />
+      <Textarea label="Notes" value={form.notes} onChange={(v) => setForm(f => ({ ...f, notes: v }))} />
+    </Modal>
+  );
+}
+
+function AddExpenseModal({ onClose, onSaved }) {
+  const [form, setForm] = useState({
+    category: "",
+    description: "",
+    amount: "",
+    date: new Date().toISOString().slice(0, 10),
+    notes: "",
+  });
+
+  async function save() {
+    await createExpense(form);
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Modal title="Add Expense" onClose={onClose} onSave={save}>
+      <Input label="Category" value={form.category} onChange={(v) => setForm(f => ({ ...f, category: v }))} />
+      <Input label="Description" value={form.description} onChange={(v) => setForm(f => ({ ...f, description: v }))} />
+      <Input label="Amount ($)" type="number" value={form.amount} onChange={(v) => setForm(f => ({ ...f, amount: v }))} />
+      <Input label="Date" type="date" value={form.date} onChange={(v) => setForm(f => ({ ...f, date: v }))} />
+      <Textarea label="Notes" value={form.notes} onChange={(v) => setForm(f => ({ ...f, notes: v }))} />
+    </Modal>
+  );
+}
+
+/* ================= UI HELPERS ================= */
+
+function Modal({ title, children, onClose, onSave }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+      <div className="w-full max-w-lg bg-neutral-900 rounded-xl border border-white/10 p-5 space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-white font-semibold">{title}</h2>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+        {children}
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="text-neutral-400">Cancel</button>
+          <button onClick={onSave} className="px-4 py-2 bg-[#B6F24A] text-black font-semibold rounded">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = "text" }) {
+  return (
+    <div>
+      <label className="text-sm text-neutral-400">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded bg-neutral-800 border border-white/10 px-3 py-2 text-white"
+      />
+    </div>
+  );
+}
+
+function Textarea({ label, value, onChange }) {
+  return (
+    <div>
+      <label className="text-sm text-neutral-400">{label}</label>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        className="mt-1 w-full rounded bg-neutral-800 border border-white/10 px-3 py-2 text-white"
+      />
+    </div>
+  );
+}
 
 function Stat({ label, value, highlight }) {
   return (
-    <div
-      className={`rounded-lg border p-4 ${
-        highlight
-          ? "border-[#B6F24A]/40 bg-[#B6F24A]/10"
-          : "border-white/10 bg-black/40"
-      }`}
-    >
+    <div className={`rounded-lg border p-4 ${highlight ? "border-[#B6F24A]/40 bg-[#B6F24A]/10" : "border-white/10 bg-black/40"}`}>
       <div className="text-sm text-neutral-400">{label}</div>
       <div className="text-2xl font-semibold text-white">{value}</div>
     </div>
@@ -209,21 +413,12 @@ function Stat({ label, value, highlight }) {
 function SearchBar({ search, setSearch }) {
   return (
     <div className="relative w-full md:max-w-sm">
-      <Search
-        size={16}
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-      />
+      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search…"
-        className="
-          w-full pl-9 pr-3 py-2 rounded-lg
-          bg-neutral-800 border border-white/10
-          text-sm text-white
-          placeholder:text-neutral-500
-          focus:outline-none focus:ring-2 focus:ring-[#B6F24A]/40
-        "
+        className="w-full pl-9 pr-3 py-2 rounded-lg bg-neutral-800 border border-white/10 text-white"
       />
     </div>
   );
@@ -236,73 +431,45 @@ function Table({ headers, rows, empty }) {
         <thead className="bg-neutral-800 text-neutral-300">
           <tr>
             {headers.map((h) => (
-              <th key={h} className="px-4 py-3 text-left font-medium">
-                {h}
-              </th>
+              <th key={h} className="px-4 py-3 text-left">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {rows.length === 0 && (
+          {rows.length === 0 ? (
             <tr>
-              <td
-                colSpan={headers.length}
-                className="px-4 py-10 text-center text-neutral-400"
-              >
+              <td colSpan={headers.length} className="px-4 py-10 text-center text-neutral-400">
                 {empty}
               </td>
             </tr>
+          ) : (
+            rows.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j} className="px-4 py-3 text-neutral-300">{c}</td>
+                ))}
+              </tr>
+            ))
           )}
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j} className="px-4 py-3 text-neutral-300">
-                  {c}
-                </td>
-              ))}
-            </tr>
-          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-function ExportCard({ title, onClick }) {
+function MobileCard({ title, subtitle, amount, meta }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/40 p-4">
-      <div className="text-sm font-medium text-white mb-3">{title}</div>
-      <button
-        onClick={onClick}
-        className="px-4 py-2 text-sm rounded bg-[#B6F24A] text-black font-semibold"
-      >
-        Download CSV
-      </button>
+    <div className="md:hidden rounded-lg border border-white/10 bg-black/40 p-4 space-y-1">
+      <div className="text-sm text-white font-medium">{title}</div>
+      {subtitle && <div className="text-xs text-neutral-400">{subtitle}</div>}
+      <div className="text-lg font-semibold text-[#B6F24A]">{amount}</div>
+      {meta && <div className="text-xs text-neutral-500">{meta}</div>}
     </div>
   );
 }
-
-/* ---------------- utils ---------------- */
 
 function formatDate(d) {
   if (!d) return "—";
   if (d.toDate) return d.toDate().toLocaleDateString();
   return new Date(d).toLocaleDateString();
-}
-
-function downloadCSV(name, rows) {
-  if (!rows.length) return;
-  const keys = Object.keys(rows[0]);
-  const csv = [
-    keys.join(","),
-    ...rows.map((r) => keys.map((k) => JSON.stringify(r[k] ?? "")).join(",")),
-  ].join("\n");
-
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
 }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { listProjects } from "../lib/projectsApi";
 import { listMessages } from "../../../lib/messagesApi";
+import { getSales } from "../lib/salesApi";
+import { getExpenses } from "../lib/expensesApi";
 
 import StatsChart from "../components/StatsChart";
 import { groupByDay } from "../lib/stats.chart.utils";
@@ -12,14 +14,35 @@ const TAX_RATE = 0.22; // estimated effective tax rate (configurable)
 export default function Stats() {
   const [projects, setProjects] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
 
   useEffect(() => {
     async function load() {
       try {
-        const [p, m] = await Promise.all([listProjects(), listMessages()]);
-        setProjects(Array.isArray(p) ? p : []);
+        const [sales, exp, m] = await Promise.all([
+          getSales(),
+          getExpenses(),
+          listMessages(),
+        ]);
+
+        const normalized = Array.isArray(sales)
+          ? sales.map((s) => ({
+              id: s.id,
+              // adapt sales -> stats without touching the rest of the file
+              budget: Number(s.amount) || 0,
+              status: s.status || "completed",
+              clientName: s.customer || "",
+              clientEmail: s.customerEmail || "",
+              createdAt: s.date || s.createdAt || null,
+              updatedAt: s.updatedAt || null,
+              source: "sales",
+            }))
+          : [];
+
+        setProjects(normalized);
+        setExpenses(Array.isArray(exp) ? exp : []);
         setMessages(Array.isArray(m) ? m : []);
       } catch (err) {
         console.error("Failed to load stats", err);
@@ -128,6 +151,11 @@ export default function Stats() {
   const totalRevenue = useMemo(
     () => projects.reduce((sum, p) => sum + n(p.budget), 0),
     [projects]
+  );
+
+  const totalExpenses = useMemo(
+    () => expenses.reduce((sum, e) => sum + n(e.amount), 0),
+    [expenses]
   );
 
   const totalTax = useMemo(() => calcTax(totalRevenue), [totalRevenue]);
@@ -407,6 +435,26 @@ export default function Stats() {
 
             <Card title="Lead Volume Over Time">
               <StatsChart data={leadSeries} />
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card title="Sales vs Expenses">
+              <Pie
+                labelA="Sales"
+                valueA={totalRevenue}
+                labelB="Expenses"
+                valueB={totalExpenses}
+              />
+            </Card>
+
+            <Card title="Net vs Tax">
+              <Pie
+                labelA="Take‑Home"
+                valueA={totalNet}
+                labelB="Tax"
+                valueB={totalTax}
+              />
             </Card>
           </div>
         </>
@@ -735,6 +783,31 @@ export default function Stats() {
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+
+function Pie({ labelA, valueA, labelB, valueB }) {
+  const total = valueA + valueB || 1;
+  const a = Math.round((valueA / total) * 100);
+
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className="h-28 w-28 rounded-full"
+        style={{
+          background: `conic-gradient(#B6F24A 0 ${a}%, rgba(255,255,255,0.15) ${a}% 100%)`,
+        }}
+      />
+      <div className="text-sm space-y-1">
+        <div className="text-slate-300">
+          {labelA}: <span className="text-[#B6F24A] font-semibold">${Math.round(valueA)}</span>
+        </div>
+        <div className="text-slate-400">
+          {labelB}: ${Math.round(valueB)}
+        </div>
+      </div>
     </div>
   );
 }
